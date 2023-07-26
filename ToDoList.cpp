@@ -2,6 +2,7 @@
 #include <vector>
 #include <fstream>
 #include <limits>
+#include <unordered_map>
 
 struct Task {
     std::string name;
@@ -16,6 +17,7 @@ struct Task {
 
 class ToDoList {
 private:
+    std::unordered_map<std::string, int> frequency_map;
     std::vector<Task> tasks;
 public:
     std::string name;
@@ -24,19 +26,44 @@ public:
 
     ToDoList(std::string name) { 
         this->name = name;
-        std::string toAdd;
         std::ifstream ifs(name.c_str());
-        while (std::getline(ifs, toAdd)) {
-            tasks.push_back(toAdd);
+
+        if (!ifs) {
+            std::ofstream ofs(name.c_str());
+        } else {
+            while(std::getline(ifs, name)) {
+                tasks.push_back(Task(name));
+                frequency_map[name]++;
+            }
         }
     }
 
-    void addTask(Task newTask) {
-        tasks.push_back(newTask);
+    void addTask(Task* newTask) {
+        int f = ++frequency_map[newTask->name];
+        if (f > 1) {
+            newTask->name = newTask->name + "(" + std::to_string(f-1) + ")";
+        }
+        tasks.push_back(*newTask);
     }
 
-    void completeTask(std::string taskName) {
+    bool editTask(std::string name, std::string newName) {
+        for (auto& task : tasks) {
+            if (task.name == name) {
+                task.name = newName;
+                return true;
+            }                
+        }
+        return false;
+    }
 
+    bool deleteTask(std::string taskName) {
+        for (auto it = tasks.begin(); it != tasks.end(); ++it) {
+            if ((*it).name == taskName) {
+                tasks.erase(it);
+                return true;
+            }
+        }
+        return false;
     }
 
     /*void retrieveList() {
@@ -57,7 +84,7 @@ public:
             std::cout << "There was an error with the file." << std::endl;
         } else {
             for (auto& task : tasks) {
-                ofs << task.name;
+                ofs << task.name + "\n";
             }
         }
     }
@@ -85,15 +112,16 @@ std::string EntryMenu(bool newUser) {
 
     std::string newUserMenu =  "Welcome to your new ToDo list app.\n1. Create your first List.\n2. Exit.\nEnter your choice: ";
     std::string existingUserMenu = "1. Create a new list.\n2. Select an existing list.\nEnter your choice: ";
+
     while (true) {
         if(newUser) {
             std::cout << newUserMenu;
+            std::cin >> option;
 
-            std::cin.clear();
-		    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-
-            if (!(std::cin >> option) || option > 2 || option < 1) {
+            if (!(std::cin.good()) || option > 2 || option < 1) {
                 std::cout << "Invalid input." << std::endl;
+                std::cin.clear();
+		        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
                 continue;
             }
             else if(option == 1) {
@@ -101,7 +129,7 @@ std::string EntryMenu(bool newUser) {
                 std::ofstream ofs(fileName.c_str(), std::ios::app);
                 std::cout << "Please enter a name for your new list: ";
                 std::cin.clear();
-		        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+		       // std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
                 std::getline(std::cin, list.name);
                 ofs << list.name + "\n";
                 ofs.close();
@@ -111,13 +139,13 @@ std::string EntryMenu(bool newUser) {
                 return "";
             } 
         } else {
-            std::cout << existingUserMenu << std::endl;
-            
-            std::cin.clear();
-		    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::cout << existingUserMenu;
+            std::cin >> option;
 
-            if (!(std::cin >> option) || option > 2 || option < 1) {
+            if (!(std::cin.good()) || option > 2 || option < 1) {
                 std::cout << "Invalid input." << std::endl;
+                std::cin.clear();
+		        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
                 continue;
             }
 
@@ -126,7 +154,7 @@ std::string EntryMenu(bool newUser) {
                 std::ofstream ofs(fileName.c_str(), std::ios::app);
                 std::cout << "Please enter a name for your new list: ";
                 std::cin.clear();
-		        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+		       // std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
                 std::getline(std::cin, list.name);
                 ofs << list.name + "\n";
                 ofs.close();
@@ -156,12 +184,14 @@ bool isNewUser() {
     const std::string fileName = "ListOfLists";
     std::ifstream ifs(fileName.c_str());
     bool newUser = false;
+
     if(!ifs) {
         std::ofstream ofs(fileName.c_str());
         newUser = true;
     } else {
         std::string temp;
         std::string result = "";
+
         while (std::getline(ifs, temp)) {
             result += temp;
         }
@@ -179,12 +209,14 @@ bool checkForList(std::string currentList) {
     const std::string listOfLists = "ListOfLists";
     std::ifstream ifs(listOfLists.c_str());
     std::string toOpen;
+
     while (std::getline(ifs, toOpen)) {
         if (toOpen == currentList) {
             break;
         }
     }
     ifs.close();
+
     if (toOpen != currentList || toOpen == "") {
         return false;
     } else {
@@ -192,20 +224,60 @@ bool checkForList(std::string currentList) {
     }
 }
 
-void mainMenu(ToDoList list) {
+void mainMenu(ToDoList *list) {
     std::string underline = "";
-    for (int i = 0; i < size(list.name) + 1; i++) {
+    for (int i = 0; i < size(list->name) + 1; i++) {
         underline += "-";
     }
 
-        std::cout << list.name << std::endl;
-        std::cout << underline << std::endl;
+    const std::string menu = "1. Add new task\n2. Edit a task\n3. Finish a task\n4. Exit\nEnter your choice: ";
 
-    if (list.toString() == "") {
-        std::cout << "Your list is empty." << std::endl;
-    } else {
-        std::cout << list.toString() << std::endl;
+    int option = -1;
+    bool exit = false;
+    std::string taskName;
+    std::string toEdit;
+    std::string newName;
+    std::string toDelete;
+    while (!exit) {
+        std::cout << list->name << std::endl;
+        std::cout << underline << std::endl;
+        std::cout << list->toString() << std::endl;
+        std::cout << menu;
+        std::cin >> option;
+        switch (option) {
+            case 1:
+                std::cout << "Enter task name: ";
+                std::cin >> taskName;
+                list->addTask(new Task(taskName));
+                break;
+            case 2:
+                std::cout << "Enter name of task to edit: ";
+                std::cin >> toEdit;
+                std::cout << "Enter new task name: ";
+                std::cin >> newName;
+
+                if (!list->editTask(taskName, newName)) {
+                    std::cout << "Task not found." << std::endl;
+                }
+                break;
+            case 3:
+                std::cout << "Enter name of task to remove: ";
+                std::cin >> toDelete;
+                if (!list->deleteTask(toDelete)) {
+                    std::cout << "Task not found." << std::endl;
+                }
+                break;
+            case 4:
+                exit = true;
+                list->saveList();
+                break;
+            default:
+                std::cout << "Invalid input" << std::endl;
+                break;
+        }
     }
+
+
 }
 
 int main() {
@@ -217,32 +289,8 @@ int main() {
 
         ToDoList list(currentList);
 
-        mainMenu(list);
+        mainMenu(&list);
     }
-
-
-        /*
-        std::cout << "2. Add a task." << std::endl;
-        std::cout << "3. Complete a task." << std::endl;
-        std::cout << "4. Delete a list." << std::endl;
-        std::cout << "5. Exit." << std::endl;
-        */
-
-       /* switch (option) {
-            case 1:
-                std::cout << "";
-                break;
-            case 2:
-                break;
-            case 3:
-                break;
-            case 4:
-                break;
-            case 5:
-                break;
-            default:
-                break;
-        }*/
     
     
     return 0;
